@@ -1,41 +1,52 @@
-!pip install python-telegram-bot --quiet
-!pip install nest_asyncio --quiet
+import os
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
-import nest_asyncio
-nest_asyncio.apply()
+# 🔐 قراءة التوكن واسم القناة من البيئة
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+CHANNEL_USERNAME = os.environ.get("CHANNEL_USERNAME")
 
-import asyncio
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+# ✅ طباعة التحقق (لـ Logs في Render)
+print(f"✅ BOT_TOKEN موجود: {bool(BOT_TOKEN)}")
+print(f"✅ CHANNEL_USERNAME: {CHANNEL_USERNAME}")
 
-BOT_TOKEN = "7786300092:AAEusxZZTjp7ondFeHns0vu2Crk1Gu_P58Y"
-CHANNEL_USERNAME = "@A2winr"
+# 🔎 التحقق من الاشتراك
+async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        user_id = update.effective_user.id
+        member = await context.bot.get_chat_member(chat_id=CHANNEL_USERNAME, user_id=user_id)
+        return member.status in ["member", "administrator", "creator"]
+    except Exception as e:
+        print(f"❌ خطأ في التحقق من الاشتراك: {e}")
+        return False
 
-async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    try:
-        member = await context.bot.get_chat_member(chat_id=CHANNEL_USERNAME, user_id=user_id)
-        return member.status in ["member", "administrator", "creator"]
-    except:
-        return False
+# 🚀 الأمر /start
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if await check_subscription(update, context):
+        await update.message.reply_text("✅ أرسل الصورة لتي تريد تعريتها")
+    else:
+        await update.message.reply_text(f"❗️ اشترك أولاً في القناة: {CHANNEL_USERNAME} ثم اضغط /start")
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if await check_subscription(update, context):
-        await update.message.reply_text("✅ أرسل الصورة لتي تريد تعريتها الآن ")
-    else:
-        await update.message.reply_text(f"❗️ اشترك أولاً في هذه القناة: {CHANNEL_USERNAME} ثم اضغط /start")
+# 📝 التعامل مع الرسائل
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await check_subscription(update, context):
+        await update.message.reply_text(f"❗️ يجب الاشتراك في القناة: {CHANNEL_USERNAME} ثم أعد المحاولة.")
+        return
 
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_subscription(update, context):
-        await update.message.reply_text(f"❗️ اشترك أولاً في القناة: {CHANNEL_USERNAME} ثم اضغط /start")
-        return
-    await update.message.reply_text("🔄 جاري المعالجة...")
-    await update.message.reply_text("❌ عذرًا، هناك ضغط كبير على الخادم، حاول لاحقًا.")
+    await update.message.reply_text("🔄 جاري المعالجة...")
+    await update.message.reply_text("❌ عذرًا، الخادم مشغول حاليًا. حاول لاحقًا.")
 
-async def main():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-    await app.run_polling()
+# ▶️ تشغيل البوت
+async def main():
+    if not BOT_TOKEN or not CHANNEL_USERNAME:
+        print("❌ BOT_TOKEN أو CHANNEL_USERNAME مفقودان!")
+        return
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    await app.run_polling()
 
-await main()
+# 🧠 تنفيذ
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
