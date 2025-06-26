@@ -1,52 +1,48 @@
 import os
+import asyncio
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
-# 🔐 قراءة التوكن واسم القناة من البيئة
+# قراءة متغيرات البيئة
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 CHANNEL_USERNAME = os.environ.get("CHANNEL_USERNAME")
 
-# ✅ طباعة التحقق (لـ Logs في Render)
 print(f"✅ BOT_TOKEN موجود: {bool(BOT_TOKEN)}")
 print(f"✅ CHANNEL_USERNAME: {CHANNEL_USERNAME}")
 
-# 🔎 التحقق من الاشتراك
-async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# التحقق من اشتراك المستخدم في القناة
+async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     try:
-        user_id = update.effective_user.id
-        member = await context.bot.get_chat_member(chat_id=CHANNEL_USERNAME, user_id=user_id)
-        return member.status in ["member", "administrator", "creator"]
+        member = await context.bot.get_chat_member(CHANNEL_USERNAME, update.effective_user.id)
+        return member.status in ("member", "administrator", "creator")
     except Exception as e:
-        print(f"❌ خطأ في التحقق من الاشتراك: {e}")
+        print(f"خطأ في التحقق من الاشتراك: {e}")
         return False
 
-# 🚀 الأمر /start
+# أمر /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if await check_subscription(update, context):
-        await update.message.reply_text("✅ أرسل الصورة لتي تريد تعريتها")
+        await update.message.reply_text("✅  مرحباً، أرسل صورة لتي تريد تعريتها.")
     else:
-        await update.message.reply_text(f"❗️ اشترك أولاً في القناة: {CHANNEL_USERNAME} ثم اضغط /start")
+        await update.message.reply_text(f"❗️ يرجى الاشتراك أولاً في القناة {CHANNEL_USERNAME} ثم أعد إرسال /start")
 
-# 📝 التعامل مع الرسائل
+# التعامل مع الرسائل النصية
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_subscription(update, context):
-        await update.message.reply_text(f"❗️ يجب الاشتراك في القناة: {CHANNEL_USERNAME} ثم أعد المحاولة.")
+        await update.message.reply_text(f"❗️ يجب أن تكون مشتركًا في القناة {CHANNEL_USERNAME} لإرسال الأوامر.")
         return
+    await update.message.reply_text("🔄 جاري معالجة طلبك...")
+    await update.message.reply_text("❌ عذراً، الخادم مشغول حالياً، حاول لاحقاً.")
 
-    await update.message.reply_text("🔄 جاري المعالجة...")
-    await update.message.reply_text("❌ عذرًا، الخادم مشغول حاليًا. حاول لاحقًا.")
-
-# ▶️ تشغيل البوت
+# نقطة البداية لتشغيل البوت
 async def main():
     if not BOT_TOKEN or not CHANNEL_USERNAME:
-        print("❌ BOT_TOKEN أو CHANNEL_USERNAME مفقودان!")
+        print("❌ متغيرات البيئة BOT_TOKEN أو CHANNEL_USERNAME غير معرفة!")
         return
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     await app.run_polling()
 
-# 🧠 تنفيذ
 if __name__ == "__main__":
-    import asyncio
     asyncio.run(main())
